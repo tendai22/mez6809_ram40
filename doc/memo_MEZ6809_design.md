@@ -10,8 +10,8 @@
 
 ## 論点
 
-* EMUPU_RAM40,48基板のRAMアクセスは間接接続を用いる。つまり、SRAM-OE,WEはPIC内部のCLCに発生させる。
-* シングルステップはHALTを用いる。
+* EMUPU_RAM40,48基板のRAMアクセスは間接接続を用いる。つまり、SRAM-OE,WEはPIC内部のCLCに発生させる。EMUZ80で試作しているので、RA2, RA4は使わないように進める。実際には無理で、RA2をQに割り当ててしまったが。
+* シングルステップはHALTを用いる。ダミーサイクル(/VMAと呼ばれている)をスキップせねばならず結構大変。
 
 ## ファーム書き込み時の挙動
 
@@ -136,3 +136,40 @@ RAM40基板でアドレス16本割り当てるとポートが足りなくなる�
 37|RESET|RE1|RESET|26|青6
   |TEST|RE2|INT|16|茶1
 35|Q|RA2|RFSH|28|橙3
+
+## 2023/9/18の状況
+
+* ブレッドボードを載せた汎用基板上に6809を搭載し、ジャンパ飛ばしまくり。
+* 下はEMUZ80そのまま使用している。そろそろram48に移行してもいいかな。
+* R/Wを10k pull up、IRQ, FIRQ, MRDYはH固定プルアップ。
+* MRDYを使わずEXTALクロックストレッチを使う予定(まだ実装していない)
+
+<figure style="text-align: center">
+<img width=500, src="img/n004-prototype-picture.JPEG">
+<figcaption>図2. Mezzanineボードのイメージ</figcaption>
+</figure>
+
+* クロック125kHz, EXTAL500kHz。
+* ソフト処理、但しReadは0x12固定置き、Writeは無視。
+
+以下が全体図、
+* 最初の10サイクルだけアドレス・データダンプ付き、11サイクル目からダンプなし。
+
+<figure style="text-align: center">
+<img width=500, src="img/n001-ss-mode-timing.png">
+<figcaption>図3. 無限NOPのタイミング全体図</figcaption>
+</figure>
+
+1サイクルの拡大図。
+
+* E上りエッジ(青緑)からRead内部処理開始(緑)まで1.85us
+* Read内部処理時間(緑-青区間)は1.35us、但しLATC=0x12;NOP固定置きのみ。
+* E下りエッジ(紫)から戻し処理開始(灰色)まで1.05us
+* 戻し処理自体は150nsしか掛かっていない。
+
+待ちを`while(RA1);`でやっているが、このループで200ns～300ns程度の区切りで増えるのだろうと推測。
+
+<figure style="text-align: center">
+<img width=500, src="img/n003-software-one-cycle.png">
+<figcaption>図4. ソフト版Eサイクル拡大図</figcaption>
+</figure>
